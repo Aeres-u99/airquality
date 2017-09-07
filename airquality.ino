@@ -12,8 +12,12 @@
   notably down as the sensor detects ethanol.
 */
 
+/* The LED to blink. */
+const int led = 13;
+
 void setup() {
   Serial.begin(9600);
+  pinMode(led, OUTPUT);
 }
 
 /*
@@ -26,21 +30,48 @@ const double rl = 44.2*1000;
 /* The input current. */
 const double vc = 5.0;
 
+/* The LED blink period. */
+double period = 1000.0;
+
+void toggle_led()
+{
+  static int led_state = LOW;
+
+  if (led_state == LOW) {
+    led_state = HIGH;
+  }
+  else {
+    led_state = LOW;
+  }
+
+  digitalWrite(led, led_state);
+}
+
 double calc_ohms(
   unsigned int sample_count,
   unsigned int sample_delay,
   boolean verbose)
 {
   unsigned int i;
+  unsigned int now;
+  unsigned long last_blink;
+
   unsigned int sum;
   double vout;
 
   sum = 0;
+  last_blink = millis();
   for (i = 0; i < sample_count; ++i) {
     sum += analogRead(A0);
     delay(sample_delay);
     if (verbose) {
       Serial.print(".");
+    }
+
+    now = millis();
+    if (now - last_blink >= period) {
+      toggle_led();
+      last_blink = now;
     }
   }
 
@@ -53,8 +84,8 @@ double calc_ohms(
   return vc*rl/vout - rl;
 }
 
-void loop() {
-  double ppm;
+void loop()
+{
   double r0;
   double ratio;
   double rs;
@@ -74,5 +105,11 @@ void loop() {
     Serial.println(rs, 3);
     Serial.print("ratio rs/r0 (lower == more substance detected): ");
     Serial.println(ratio, 3);
+
+    /*
+       Make blink frequency be at ratio/10 Hz, so that a lower ratio (more substance)
+       means faster blinking.
+     */
+     period = 1000.0/10.0 * ratio;
   }
 }
